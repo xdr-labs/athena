@@ -92,7 +92,6 @@ export function loginRouter(provider: AthenaOAuthProvider, instanceName: string)
     if (!provider.checkPassword(password)) {
       provider.recordFailure(ip)
       const { linkBurned } = provider.registerFailedAttempt(sid)
-      const pending = linkBurned ? undefined : provider.getPending(sid)
       sendPage(
         res,
         renderLoginPage({

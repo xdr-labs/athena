@@ -227,9 +227,9 @@ export class Indexer {
     this.state.delete(pageId)
   }
 
-  async search(query: string, limit = 8): Promise<StoredChunk[]> {
+  async search(query: string, limit = 8, pathPrefix?: string): Promise<StoredChunk[]> {
     const vector = await this.embeddings.embedOne(query)
-    return this.store.search(vector, Math.max(1, Math.min(limit, 20)))
+    return this.store.search(vector, Math.max(1, Math.min(limit, 20)), pathPrefix)
   }
 
   async stats() {

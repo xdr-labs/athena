@@ -29,8 +29,12 @@ export class IndexerClient {
     return (await response.json()) as T
   }
 
-  async search(query: string, limit = 8): Promise<SemanticHit[]> {
-    const data = await this.post<{ hits?: SemanticHit[] }>('/search', { query, limit }, 60_000)
+  async search(query: string, limit = 8, pathPrefix?: string): Promise<SemanticHit[]> {
+    const data = await this.post<{ hits?: SemanticHit[] }>(
+      '/search',
+      { query, limit, ...(pathPrefix ? { path_prefix: pathPrefix } : {}) },
+      60_000,
+    )
     return data.hits ?? []
   }
 

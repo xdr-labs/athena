@@ -121,14 +121,25 @@ export class VectorStore {
    * `<=>` is pgvector's cosine distance, where 0 is identical, so the score is
    * reported as similarity to match what the merge step expects.
    */
-  async search(vector: number[], limit = 8): Promise<StoredChunk[]> {
-    const rows = await this.sql`
-      SELECT page_id, page_path, page_title, locale, chunk_index, content, headings,
-             1 - (embedding <=> ${toVector(vector)}::vector) AS score
-      FROM chunks
-      ORDER BY embedding <=> ${toVector(vector)}::vector
-      LIMIT ${Math.max(1, Math.min(limit, 50))}
-    `
+  async search(vector: number[], limit = 8, pathPrefix?: string): Promise<StoredChunk[]> {
+    const cap = Math.max(1, Math.min(limit, 50))
+    const prefix = pathPrefix?.replace(/^\/+|\/+$/g, '')
+    const rows = prefix
+      ? await this.sql`
+          SELECT page_id, page_path, page_title, locale, chunk_index, content, headings,
+                 1 - (embedding <=> ${toVector(vector)}::vector) AS score
+          FROM chunks
+          WHERE page_path = ${prefix} OR page_path LIKE ${`${prefix}/%`}
+          ORDER BY embedding <=> ${toVector(vector)}::vector
+          LIMIT ${cap}
+        `
+      : await this.sql`
+          SELECT page_id, page_path, page_title, locale, chunk_index, content, headings,
+                 1 - (embedding <=> ${toVector(vector)}::vector) AS score
+          FROM chunks
+          ORDER BY embedding <=> ${toVector(vector)}::vector
+          LIMIT ${cap}
+        `
     return rows.map(row => {
       const headings = (row.headings ?? {}) as Record<string, string>
       return {

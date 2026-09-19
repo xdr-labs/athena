@@ -22,7 +22,7 @@ import { mcpAuthRouter } from '@modelcontextprotocol/sdk/server/auth/router.js'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import express, { type Express } from 'express'
-import { AthenaOAuthProvider } from './auth/provider.ts'
+import { AthenaOAuthProvider, READ_SCOPE, SUPPORTED_SCOPES } from './auth/provider.ts'
 import { loginRouter } from './auth/routes.ts'
 import { IndexerClient } from './indexer-client.ts'
 import { registerTools } from './tools.ts'
@@ -64,12 +64,12 @@ export async function buildApp(config: McpConfig, sql: Sql): Promise<Express> {
       issuerUrl,
       resourceServerUrl: new URL('/mcp', issuerUrl),
       resourceName: config.instanceName,
-      scopesSupported: ['wiki'],
+      scopesSupported: SUPPORTED_SCOPES,
     }),
   )
   app.use(loginRouter(provider, config.instanceName))
 
-  const requireAuth = requireBearerAuth({ verifier: provider, requiredScopes: ['wiki'] })
+  const requireAuth = requireBearerAuth({ verifier: provider, requiredScopes: [READ_SCOPE] })
 
   app.all('/mcp', requireAuth, express.json({ limit: '4mb' }), async (req, res) => {
     // A fresh server and transport per request keeps sessions stateless, so a
@@ -89,6 +89,7 @@ export async function buildApp(config: McpConfig, sql: Sql): Promise<Express> {
       log,
       timeZone: config.tz,
       currentActor: () => actor,
+      currentScopes: () => req.auth?.scopes ?? [],
     })
 
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })

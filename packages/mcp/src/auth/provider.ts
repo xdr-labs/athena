@@ -43,7 +43,10 @@ const MAX_LOGIN_ATTEMPTS = 3
 const THROTTLE_WINDOW_MS = 60_000
 const THROTTLE_MAX_FAILURES = 5
 
-const SCOPES = ['wiki']
+export const READ_SCOPE = 'wiki.read'
+export const WRITE_SCOPE = 'wiki.write'
+export const DEFAULT_SCOPES = [READ_SCOPE]
+export const SUPPORTED_SCOPES = [READ_SCOPE, WRITE_SCOPE]
 
 export type PendingLogin = {
   client: OAuthClientInformationFull
@@ -246,7 +249,7 @@ export class AthenaOAuthProvider implements OAuthServerProvider {
       // a token with no scopes is rejected by the MCP endpoint as
       // "insufficient_scope". The client then reports that no MCP server could
       // be found, which is a confusing way to say "your token is unusable".
-      scopes: entry.params.scopes?.length ? entry.params.scopes : SCOPES,
+      scopes: entry.params.scopes?.length ? entry.params.scopes : DEFAULT_SCOPES,
       resource: entry.params.resource?.href,
       expiresAt: Date.now() + AUTH_CODE_TTL_MS,
     })
@@ -364,7 +367,7 @@ export class AthenaOAuthProvider implements OAuthServerProvider {
       return {
         token: presented,
         clientId: BEARER_CLIENT_ID,
-        scopes: SCOPES,
+        scopes: DEFAULT_SCOPES,
         expiresAt: Math.floor(Date.now() / 1000) + ACCESS_TOKEN_TTL_SECONDS,
       }
     }

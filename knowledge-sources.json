@@ -1,0 +1,12 @@
+{
+  "sources": [
+    {
+      "project": "data-relay-link",
+      "title": "Data Relay Link — Canonical Source of Truth",
+      "repository": "datarelay-labs/data-relay-link",
+      "ref": "feat/decision-capture-automation-clean",
+      "source_path": "knowledge/CANONICAL_SOURCE_OF_TRUTH.md",
+      "wiki_path": "projects/data-relay-link/canonical-source-of-truth"
+    }
+  ]
+}

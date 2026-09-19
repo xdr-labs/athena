@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { BEARER_CLIENT_ID } from '@athena/core'
 import type { AuthorizationParams } from '@modelcontextprotocol/sdk/server/auth/provider.js'
 import type { OAuthClientInformationFull } from '@modelcontextprotocol/sdk/shared/auth.js'
-import { AthenaOAuthProvider, secretsEqual } from './provider.ts'
+import { AthenaOAuthProvider, READ_SCOPE, WRITE_SCOPE, secretsEqual } from './provider.ts'
 
 const PASSWORD = 'correct-horse-battery-staple'
 
@@ -23,7 +23,7 @@ const params = (): AuthorizationParams => ({
   codeChallenge: 'challenge-value',
   redirectUri: 'https://claude.ai/api/mcp/auth_callback',
   state: 'state-123',
-  scopes: ['wiki'],
+  scopes: [READ_SCOPE],
 })
 
 /** Captures the redirect an Express handler would have sent. */
@@ -79,7 +79,7 @@ describe('bearer token', () => {
   test('the shared secret authenticates directly', async () => {
     const info = await provider.verifyAccessToken(PASSWORD)
     expect(info.clientId).toBe(BEARER_CLIENT_ID)
-    expect(info.scopes).toContain('wiki')
+    expect(info.scopes).toEqual([READ_SCOPE])
   })
 
   test('a wrong secret is rejected', () => {
@@ -161,7 +161,7 @@ describe('issued tokens', () => {
     const tokens = await provider.exchangeAuthorizationCode(c, code)
     const info = await provider.verifyAccessToken(tokens.access_token)
     expect(info.clientId).toBe('client-1')
-    expect(info.scopes).toEqual(['wiki'])
+    expect(info.scopes).toEqual([READ_SCOPE])
   })
 
   test('refreshing rotates both tokens and retires the old pair', async () => {
@@ -257,17 +257,19 @@ describe('scopes', () => {
     const code = new URL(provider.completeLogin(sid)).searchParams.get('code')!
 
     const tokens = await provider.exchangeAuthorizationCode(c, code)
-    expect(tokens.scope).toBe('wiki')
-    expect((await provider.verifyAccessToken(tokens.access_token)).scopes).toEqual(['wiki'])
+    expect(tokens.scope).toBe(READ_SCOPE)
+    expect((await provider.verifyAccessToken(tokens.access_token)).scopes).toEqual([READ_SCOPE])
   })
 
   test('an explicitly requested scope is preserved', async () => {
     const c = client('client-2')
     await provider.clientsStore.registerClient!(c)
     const { res, captured } = fakeRes()
-    await provider.authorize(c, { ...params(), scopes: ['wiki'] }, res)
+    await provider.authorize(c, { ...params(), scopes: [READ_SCOPE, WRITE_SCOPE] }, res)
     const sid = new URL(captured.location!).searchParams.get('sid')!
     const code = new URL(provider.completeLogin(sid)).searchParams.get('code')!
-    expect((await provider.exchangeAuthorizationCode(c, code)).scope).toBe('wiki')
+    expect((await provider.exchangeAuthorizationCode(c, code)).scope).toBe(
+      `${READ_SCOPE} ${WRITE_SCOPE}`,
+    )
   })
 })

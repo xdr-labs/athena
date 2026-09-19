@@ -33,9 +33,21 @@ export type ToolContext = {
   timeZone: string
   /** Resolves the calling client to a display name for the provenance footer. */
   currentActor: () => string
+  /** OAuth scopes for this MCP request. */
+  currentScopes: () => string[]
 }
 
 const pathArg = z.string().min(1).describe('Wiki page path, for example it/dns')
+
+export const WRITE_TOOL_NAMES = new Set([
+  'create_page',
+  'update_page',
+  'append_to_page',
+  'move_page',
+  'delete_page',
+  'save_conversation',
+  'capture_note',
+])
 
 /** What a tool wants recorded in the activity log beyond its own name. */
 type EventDetail = { pagePath?: string | null; query?: string | null }
@@ -63,6 +75,7 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
     run: (args: z.infer<z.ZodObject<S>>) => Promise<unknown>,
     detail: (args: z.infer<z.ZodObject<S>>) => EventDetail = () => ({}),
   ): void {
+    if (WRITE_TOOL_NAMES.has(name) && !ctx.currentScopes().includes('wiki.write')) return
     server.registerTool(name, config, (async (args: z.infer<z.ZodObject<S>>) => {
       const started = performance.now()
       const base = { actor: ctx.currentActor(), tool: name, ...detail(args) }
@@ -116,21 +129,35 @@ export function registerTools(server: McpServer, ctx: ToolContext): void {
       inputSchema: {
         query: z.string().min(1).describe('What to look for'),
         limit: z.number().int().min(1).max(20).default(8).describe('Maximum hits'),
+        path_prefix: z
+          .string()
+          .min(1)
+          .optional()
+          .describe('Optional project/path prefix, for example projects/data-relay-link'),
       },
     },
-    async ({ query, limit }) => {
+    async ({ query, limit, path_prefix }) => {
       const trimmed = query.trim()
       if (!trimmed) return []
       const cap = Math.max(1, Math.min(limit ?? 8, 20))
       const fetchCount = Math.min(cap * 2, 20)
+      const prefix = path_prefix ? normalizePath(path_prefix) : ''
+      const inPrefix = (path: string | undefined) => {
+        if (!prefix) return true
+        const normalized = normalizePath(path ?? '')
+        return normalized === prefix || normalized.startsWith(`${prefix}/`)
+      }
 
       // One source failing must still return the other's results.
       const [classic, semantic] = await Promise.all([
-        wiki.searchPages(trimmed, fetchCount).catch(error => {
-          log.warn('keyword search failed', { error: String(error) })
-          return []
-        }),
-        indexer.search(trimmed, fetchCount).catch(error => {
+        wiki
+          .searchPages(trimmed, fetchCount)
+          .then(hits => hits.filter(hit => inPrefix(hit.path)))
+          .catch(error => {
+            log.warn('keyword search failed', { error: String(error) })
+            return []
+          }),
+        indexer.search(trimmed, fetchCount, prefix || undefined).catch(error => {
           log.warn('semantic search failed', { error: String(error) })
           return []
         }),

@@ -14,6 +14,7 @@ import type { Indexer } from './indexer.ts'
 const searchBody = z.object({
   query: z.string().min(1, 'query required'),
   limit: z.coerce.number().int().min(1).max(20).default(8),
+  path_prefix: z.string().min(1).optional(),
 })
 
 const pageBody = z.object({
@@ -41,7 +42,13 @@ export function buildApp(indexer: Indexer, log: Logger): Express {
       return
     }
     try {
-      res.json({ hits: await indexer.search(parsed.data.query, parsed.data.limit) })
+      res.json({
+        hits: await indexer.search(
+          parsed.data.query,
+          parsed.data.limit,
+          parsed.data.path_prefix,
+        ),
+      })
     } catch (error) {
       log.error('search failed', { error: String(error) })
       res.status(500).json({ error: 'search failed' })
